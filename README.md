@@ -16,6 +16,12 @@ The goals / steps of this project are the following:
 ## Rubric Points
 ### Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
 
+[original]: ./images/original.png "Original images"
+[cropped]: ./images/cropped.png "Cropped images"
+[translated]: ./images/translate.png "Translated images"
+[brightness]: ./images/brightness.png "Brighness adjusted images"
+[flip]: ./images/flipped.png "flipped images"
+
 ---
 ### Files Submitted & Code Quality
 
@@ -120,7 +126,27 @@ dense_1 (Dense)                  (None, 1)             65          FC3[0][0]
 #### 3. Creation of the Training Set & Training Process
 
 I used front, left and side camera images togather with augmented data to get the final training and validation data.
-I defined methods which will select- front, left or right images also methods which will augment the data. The function `translate_image()` randomly translates the image horizantally making corresponding adjustments in the steering data also. Next function `brightness_img` randomly adjusts the brightness of the image, `flip_img` filps my image and steering data. The fist two function will help my model better generalize and the third function will help me better balance the data sets. Now my function `generate_train_data` will randomly gets augmented or unaugmened image and add it into the dataset. `data_size` parameter defines how many of these images are added. Thus these images will introduce enough variablity and balance in the dataset so that my model will generalize better.
+I defined methods which will select- front, left or right images also methods which will augment the data. A sample left, front and right camera images are shown below.
+
+![Original image][original]
+
+Function `crop_image()` crops the image.
+
+![Cropped image][cropped]
+
+The function `translate_image()` randomly translates the image horizantally making corresponding adjustments in the steering data also. 
+
+![Translated image][translated]
+
+Next function `brightness_img` randomly adjusts the brightness of the image
+
+![Brighness adjusted image][brightness]
+
+Function `flip_img` filps my image and steering data. 
+
+![Flipped image][flip]
+
+The fist two function will help my model better generalize and the third function will help me better balance the data sets.Now my function `generate_train_data` will randomly gets augmented or unaugmened image and add it into the dataset. `data_size` parameter defines how many of these images are added. Thus these images will introduce enough variablity and balance in the dataset so that my model will generalize better.
 
 For validataion i only used images from the front camera as those are the ones which my simulator is going to operate on. On trainig data i used both front as well as side image. When using side images i add a correction factor of .22 to them depending on the direction.
 

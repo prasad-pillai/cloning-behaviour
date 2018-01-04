@@ -13,66 +13,87 @@ from keras.models import Sequential, Model
 from keras.layers.core import Dense, Dropout, Activation, Lambda
 from keras.optimizers import Adam
 from keras.layers import Convolution2D, MaxPooling2D, Flatten, Input, Cropping2D
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 
-my_csv_path = 'driving_log.csv'
+my_csv_path = 'my_data/driving_log.csv'
 udacity_csv_path = 'data/driving_log.csv'
 
-center_db, left_db, right_db, steer_db = [], [], [], []
+def load(csv_filename, win):
+    """
+    win: whether windows style path
+    """
+    lines = []
+    with open(csv_filename) as csvfile:
+        reader = csv.reader(csvfile)
+        for line in reader:
+            # print(line)
+            lines.append(line)
+    # print(lines[0], lines[1])
+    lines = lines[1:]
+    center_db, left_db, right_db, steer_db = [], [], [], []
+    # read csv file
+    for line in lines:
+        front_img_path = line[0]
+        left_img_path = line[1]
+        right_img_path = line[2]
+        if win:
+            front_filename = front_img_path.split('\\')[-1]
+            left_filename = left_img_path.split('\\')[-1]
+            right_filename = right_img_path.split('\\')[-1]
+            front_img_path = './my_data/IMG/' + front_filename
+            left_img_path = './my_data/IMG/' + left_filename
+            right_img_path = './my_data/IMG/' + right_filename
+        else:
+            front_filename = front_img_path.split('/')[-1]
+            left_filename = left_img_path.split('/')[-1]
+            right_filename = right_img_path.split('/')[-1]
 
-lines = []
-with open(udacity_csv_path) as csvfile:
-    reader = csv.reader(csvfile)
-    for line in reader:
-        # print(line)
-        lines.append(line)
-# print(lines[0], lines[1])
-lines = lines[1:]
+            front_img_path = './data/IMG/' + front_filename
+            left_img_path = './data/IMG/' + left_filename
+            right_img_path = './data/IMG/' + right_filename
 
-# read csv file
-for line in lines:
-    front_img_path = line[0]
-    left_img_path = line[1]
-    right_img_path = line[2]
-    front_filename = front_img_path.split('/')[-1]
-    left_filename = left_img_path.split('/')[-1]
-    right_filename = right_img_path.split('/')[-1]
-    front_img_path = './data/IMG/' + front_filename
-    left_img_path = './data/IMG/' + left_filename
-    right_img_path = './data/IMG/' + right_filename
-    
-    steering = float(line[3])
-    if steering != 0.0:
-        center_db.append(front_img_path)
-        left_db.append(left_img_path)
-        right_db.append(right_img_path)
-        steer_db.append(steering)
-    else:
-        prob = np.random.uniform()
-        if prob <= 0.2:
+        steering = float(line[3])
+        if steering != 0.0:
             center_db.append(front_img_path)
             left_db.append(left_img_path)
             right_db.append(right_img_path)
             steer_db.append(steering)
+        else:
+            prob = np.random.uniform()
+            if prob <= 0.2:
+                center_db.append(front_img_path)
+                left_db.append(left_img_path)
+                right_db.append(right_img_path)
+                steer_db.append(steering)
+    return center_db, left_db, right_db, steer_db
 
-                
+
+center_db, left_db, right_db, steer_db = load(udacity_csv_path, False)
+
 # shuffle the dataset
 center_db, left_db, right_db, steer_db = shuffle(center_db, left_db, right_db, steer_db)
 
 # train & valid data split
 img_train, img_valid, steer_train, steer_valid = train_test_split(center_db, steer_db, test_size=0.1, random_state=42)
 
+print(len(img_train), len(img_valid))
+
+print(img_train[0])
 
 def select_center_img(center, steer, index):
     image, steering = cv2.imread(center[index]), steer[index]
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image, steering
 
 def select_left_img(left, steer, index, offset=0.22):
     image, steering = cv2.imread(left[index]), steer[index] + offset
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image, steering
 
 def select_right_img(right, steer, index, offset=0.22):
     image, steering = cv2.imread(right[index]), steer[index] - offset
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image, steering
 
 def translate_img(image, steer):
@@ -172,10 +193,10 @@ def model():
     """
     # Initializing the model
     model = Sequential()
-    # Input and normalization layer
-    model.add(Lambda(lambda x: x / 127.5 - 1.0, input_shape=(160, 320, 3)))
     # Cropping layer
-    model.add(Cropping2D(cropping=((60,20), (0,0))))
+    model.add(Cropping2D(cropping=((60,20), (0,0)), input_shape=(160, 320, 3)))
+    # Input and normalization layer
+    model.add(Lambda(lambda x: x / 127.5 - 1.0))
     # First conv layer with relu activation
     model.add(Convolution2D(32, 3, 3, border_mode='same', subsample=(2, 2), activation='relu', name='Conv1'))
     # First pooling layer: max pooling
@@ -204,12 +225,13 @@ def model():
 
 model = model()
 
+# Callback to save model file every epoch
+checkpoint = ModelCheckpoint('model.h5', monitor='val_loss', verbose=0, save_best_only=False, save_weights_only=False, mode='auto', period=1)
+# early stopping to prevent over fitting
+early_stop = EarlyStopping(monitor='val_loss', min_delta=0, patience=0, verbose=0, mode='auto')
+
 adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 model.compile(optimizer=adam, loss='mse')
 
-model.fit(X_train, y_train, nb_epoch=7, validation_data=(X_val, y_val), verbose=1)
-
-
-model.save('model.h5')
-
+model.fit(X_train, y_train, nb_epoch=20, validation_data=(X_val, y_val), shuffle=True, verbose=1, callbacks=[checkpoint, early_stop])
 
